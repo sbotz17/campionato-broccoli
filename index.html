@@ -55,11 +55,10 @@
 <div class="container">
   <header>
     <h1>🥦 Campionato dei Broccoli</h1>
-    <p class="subtitle">Sincronizzato in Tempo Reale</p>
+    <p class="subtitle">Cloud Sincronizzato</p>
   </header>
 
   <div class="grid">
-    <!-- Classifica -->
     <div class="card">
       <h2>🏆 Classifica Singola</h2>
       <table>
@@ -71,11 +70,10 @@
             <th>V - P</th>
           </tr>
         </thead>
-        <tbody id="classifica-body"><tr><td colspan="4" class="text-center">Connessione al database...</td></tr></tbody>
+        <tbody id="classifica-body"><tr><td colspan="4" class="text-center">Connessione al database cloud...</td></tr></tbody>
       </table>
     </div>
 
-    <!-- Pannello Inserimento -->
     <div>
       <div class="card">
         <h2>➕ Aggiungi Incontro</h2>
@@ -95,28 +93,19 @@
         </div>
         <button id="btn-add-match">Registra Partita</button>
       </div>
-
-      <div class="card">
-        <h2>👤 Nuovo Giocatore</h2>
-        <div class="form-group" style="margin-bottom:0;">
-          <input type="text" id="nuovo-giocatore-nome" placeholder="Nome giocatore...">
-        </div>
-        <button id="btn-add-player" class="btn-secondary">Aggiungi Giocatore</button>
-      </div>
     </div>
   </div>
 
-  <!-- Partite -->
   <div class="card">
     <h2>🎾 Incontri del Torneo</h2>
-    <div id="partite-list" class="text-center">Caricamento partite...</div>
+    <div id="partite-list" class="text-center">Caricamento incontri...</div>
   </div>
 </div>
 
-<!-- Firebase SDKs -->
+<!-- Firebase SDKs e logica di sincronizzazione real-time -->
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-  import { getDatabase, ref, set, onValue, update } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+  import { getDatabase, ref, set, onValue } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
 
   const firebaseConfig = {
     apiKey: "AIzaSyBQyQI3TjlbGozQC5i3BEv_1Pfwa2d1sqc",
@@ -131,7 +120,7 @@
   const db = getDatabase(app);
   const dbRef = ref(db, 'campionato');
 
-  const datiIniziali = {
+  let stato = {
     giocatori: ["Andre", "Tommy", "Zanna", "Teo"],
     partite: [
       { c1: ["Zanna", "Teo"], c2: ["Tommy", "Andre"], vincitore: 2 },
@@ -142,25 +131,19 @@
     ]
   };
 
-  let stato = datiIniziali;
-
-  // Ascolta i cambiamenti in tempo reale dal database
+  // Ascolta i cambiamenti in tempo reale da Firebase
   onValue(dbRef, (snapshot) => {
     const data = snapshot.val();
     if (data) {
       stato = data;
-      if (!stato.giocatori) stato.giocatori = datiIniziali.giocatori;
+      if (!stato.giocatori) stato.giocatori = ["Andre", "Tommy", "Zanna", "Teo"];
       if (!stato.partite) stato.partite = [];
     } else {
-      // Se il database è vuoto, carica i dati iniziali
-      set(dbRef, datiIniziali);
+      // Se il database è vuoto, inizializza con i dati di default
+      set(dbRef, stato);
     }
     aggiornaInterfaccia();
   });
-
-  function salvaDatabase() {
-    set(dbRef, stato);
-  }
 
   function aggiornaInterfaccia() {
     popolaSelect();
@@ -232,14 +215,12 @@
         actions = `
           <button class="btn-sm btn-success" onclick="window.impostaVincitore(${idx}, 1)">Vince C1</button>
           <button class="btn-sm btn-success" onclick="window.impostaVincitore(${idx}, 2)">Vince C2</button>
-          <button class="btn-sm btn-danger" onclick="window.eliminaPartita(${idx})">Elimina</button>
         `;
       } else {
         const vincenti = (p.vincitore === 1) ? p.c1.join(' & ') : p.c2.join(' & ');
         actions = `
           <span class="badge badge-win">Vince: ${vincenti}</span>
           <button class="btn-sm btn-warning" onclick="window.impostaVincitore(${idx}, 0)">Annulla</button>
-          <button class="btn-sm btn-danger" onclick="window.eliminaPartita(${idx})">Elimina</button>
         `;
       }
 
@@ -254,14 +235,7 @@
 
   window.impostaVincitore = (idx, vincitore) => {
     stato.partite[idx].vincitore = vincitore;
-    salvaDatabase();
-  };
-
-  window.eliminaPartita = (idx) => {
-    if (confirm('Vuoi eliminare questa partita?')) {
-      stato.partite.splice(idx, 1);
-      salvaDatabase();
-    }
+    salvaCloud();
   };
 
   document.getElementById('btn-add-match').addEventListener('click', () => {
@@ -271,24 +245,19 @@
     const p2b = document.getElementById('p2b').value;
 
     if (new Set([p1a, p1b, p2a, p2b]).size !== 4) {
-      alert('I 4 giocatori devono essere tutti diversi!');
+      alert('I 4 giocatori devono essere diversi!');
       return;
     }
 
     if (!stato.partite) stato.partite = [];
     stato.partite.push({ c1: [p1a, p1b], c2: [p2a, p2b], vincitore: 0 });
-    salvaDatabase();
+    salvaCloud();
   });
 
-  document.getElementById('btn-add-player').addEventListener('click', () => {
-    const input = document.getElementById('nuovo-giocatore-nome');
-    const nome = input.value.trim();
-    if (nome && !stato.giocatori.includes(nome)) {
-      stato.giocatori.push(nome);
-      input.value = '';
-      salvaDatabase();
-    }
-  });
+  // Salva sul database cloud Firebase
+  function salvaCloud() {
+    set(dbRef, stato);
+  }
 </script>
 
 </body>
