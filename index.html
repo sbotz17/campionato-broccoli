@@ -93,6 +93,15 @@
         </div>
         <button id="btn-add-match">Registra Partita</button>
       </div>
+
+      <!-- SEZIONE AGGIUNTA PER CREARE NUOVI GIOCATORI -->
+      <div class="card">
+        <h2>👤 Nuovo Giocatore</h2>
+        <div class="form-group" style="margin-bottom:0;">
+          <input type="text" id="nuovo-giocatore-nome" placeholder="Nome giocatore...">
+        </div>
+        <button id="btn-add-player" class="btn-secondary">Aggiungi Giocatore</button>
+      </div>
     </div>
   </div>
 
@@ -120,7 +129,6 @@
   const db = getDatabase(app);
   const dbRef = ref(db, 'campionato');
 
-  // Stato iniziale di fallback nel caso il database cloud fosse totalmente vuoto
   let stato = {
     giocatori: ["Andre", "Tommy", "Zanna", "Teo"],
     partite: [
@@ -132,14 +140,17 @@
     ]
   };
 
-  // Ascolta i cambiamenti in tempo reale da Firebase (preserva i dati esistenti)
+  const salvatoLocale = localStorage.getItem('broccoli_db');
+  if (salvatoLocale) {
+    try { stato = JSON.parse(salvatoLocale); } catch(e) {}
+  }
+
   onValue(dbRef, (snapshot) => {
     const data = snapshot.val();
     if (data) {
-      // Se ci sono dati sul cloud, usiamo quelli senza sovrascriverli
       stato = data;
+      localStorage.setItem('broccoli_db', JSON.stringify(stato));
     } else {
-      // Se il database è vuoto per la prima volta, carica i dati di default
       set(dbRef, stato);
     }
     aggiornaInterfaccia();
@@ -259,8 +270,21 @@
     salvaCloud();
   });
 
-  // Funzione di salvataggio aggiornato su Firebase
+  // Gestione aggiunta nuovo giocatore da interfaccia
+  document.getElementById('btn-add-player').addEventListener('click', () => {
+    const input = document.getElementById('nuovo-giocatore-nome');
+    const nome = input.value.trim();
+    if (nome && !stato.giocatori.includes(nome)) {
+      stato.giocatori.push(nome);
+      input.value = '';
+      salvaCloud();
+    } else if (nome) {
+      alert('Questo giocatore esiste già!');
+    }
+  });
+
   function salvaCloud() {
+    localStorage.setItem('broccoli_db', JSON.stringify(stato));
     set(dbRef, stato);
   }
 </script>
