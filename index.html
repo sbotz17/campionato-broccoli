@@ -70,7 +70,7 @@
             <th>V - P</th>
           </tr>
         </thead>
-        <tbody id="classifica-body"><tr><td colspan="4" class="text-center">Connessione al database cloud...</td></tr></tbody>
+        <tbody id="classifica-body"><tr><td colspan="4" class="text-center">Connessione al database...</td></tr></tbody>
       </table>
     </div>
 
@@ -120,6 +120,7 @@
   const db = getDatabase(app);
   const dbRef = ref(db, 'campionato');
 
+  // Stato iniziale di fallback nel caso il database cloud fosse totalmente vuoto
   let stato = {
     giocatori: ["Andre", "Tommy", "Zanna", "Teo"],
     partite: [
@@ -131,15 +132,14 @@
     ]
   };
 
-  // Ascolta i cambiamenti in tempo reale da Firebase
+  // Ascolta i cambiamenti in tempo reale da Firebase (preserva i dati esistenti)
   onValue(dbRef, (snapshot) => {
     const data = snapshot.val();
     if (data) {
+      // Se ci sono dati sul cloud, usiamo quelli senza sovrascriverli
       stato = data;
-      if (!stato.giocatori) stato.giocatori = ["Andre", "Tommy", "Zanna", "Teo"];
-      if (!stato.partite) stato.partite = [];
     } else {
-      // Se il database è vuoto, inizializza con i dati di default
+      // Se il database è vuoto per la prima volta, carica i dati di default
       set(dbRef, stato);
     }
     aggiornaInterfaccia();
@@ -156,19 +156,23 @@
       const select = document.getElementById(id);
       const val = select.value;
       select.innerHTML = '';
-      stato.giocatori.forEach(g => {
-        const opt = document.createElement('option');
-        opt.value = g;
-        opt.textContent = g;
-        select.appendChild(opt);
-      });
-      if (stato.giocatori.includes(val)) select.value = val;
+      if (stato.giocatori) {
+        stato.giocatori.forEach(g => {
+          const opt = document.createElement('option');
+          opt.value = g;
+          opt.textContent = g;
+          select.appendChild(opt);
+        });
+      }
+      if (stato.giocatori && stato.giocatori.includes(val)) select.value = val;
     });
   }
 
   function calcolaClassifica() {
     let stats = {};
-    stato.giocatori.forEach(g => stats[g] = { punti: 0, vinte: 0, perse: 0 });
+    if (stato.giocatori) {
+      stato.giocatori.forEach(g => stats[g] = { punti: 0, vinte: 0, perse: 0 });
+    }
 
     if (stato.partite) {
       stato.partite.forEach(p => {
@@ -181,6 +185,7 @@
       });
     }
 
+    if (!stato.giocatori) return;
     let classifica = stato.giocatori.map(name => ({
       nome: name,
       ...(stats[name] || { punti: 0, vinte: 0, perse: 0 })
@@ -254,7 +259,7 @@
     salvaCloud();
   });
 
-  // Salva sul database cloud Firebase
+  // Funzione di salvataggio aggiornato su Firebase
   function salvaCloud() {
     set(dbRef, stato);
   }
