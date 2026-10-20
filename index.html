@@ -1,0 +1,867 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Campionato dei Broccoli</title>
+  <style>
+    :root {
+      --primary: #4f46e5;
+      --primary-hover: #4338ca;
+      --bg-color: #f8fafc;
+      --card-bg: #ffffff;
+      --text-main: #1e293b;
+      --text-muted: #64748b;
+      --border: #e2e8f0;
+    }
+    [hidden] { display: none !important; }
+    body {
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+      background-color: var(--bg-color);
+      color: var(--text-main);
+      margin: 0;
+      padding: 16px;
+    }
+    .container { max-width: 800px; margin: 0 auto; }
+    header { text-align: center; margin-bottom: 24px; }
+    h1 { color: var(--primary); margin: 0; font-size: 2rem; }
+    p.subtitle { color: var(--text-muted); margin-top: 4px; font-size: 0.95rem; }
+    p.subtitle.ok { color: #16a34a; }
+    p.subtitle.offline { color: #dc2626; }
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    @media (max-width: 768px) { .grid { grid-template-columns: 1fr; } }
+    .card { background: var(--card-bg); padding: 20px; border-radius: 16px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); margin-bottom: 16px; border: 1px solid var(--border); }
+    h2 { margin-top: 0; color: var(--text-main); font-size: 1.15rem; border-bottom: 2px solid var(--border); padding-bottom: 10px; }
+    .form-group { margin-bottom: 12px; }
+    label { display: block; font-weight: 600; margin-bottom: 6px; font-size: 0.8rem; color: var(--text-muted); text-transform: uppercase; }
+    select, input[type="text"], input[type="email"], input[type="password"] { width: 100%; padding: 10px; border: 1px solid var(--border); border-radius: 8px; font-size: 0.95rem; box-sizing: border-box; background-color: #fff; }
+    button { width: 100%; background-color: var(--primary); color: white; border: none; padding: 12px; font-size: 0.95rem; border-radius: 8px; cursor: pointer; font-weight: 600; margin-top: 8px; }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+    table { width: 100%; border-collapse: collapse; margin-top: 8px; }
+    th, td { padding: 10px; text-align: left; border-bottom: 1px solid var(--border); font-size: 0.9rem; }
+    th { background-color: #f1f5f9; color: var(--text-muted); font-weight: 600; text-transform: uppercase; font-size: 0.8rem; }
+    .match-item { display: flex; flex-direction: column; gap: 10px; padding: 12px; background: #fafafa; border: 1px solid var(--border); border-radius: 10px; margin-bottom: 10px; }
+    @media(min-width: 500px) { .match-item { flex-direction: row; justify-content: space-between; align-items: center; } }
+    .match-actions { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+    .match-meta { font-size: 0.75rem; color: var(--text-muted); margin-top: 4px; }
+    .badge { padding: 6px 10px; border-radius: 20px; font-size: 0.8rem; font-weight: 600; }
+    .badge-win { background-color: #dcfce7; color: #166534; }
+    .badge-admin { background-color: #fef3c7; color: #92400e; }
+    .badge-utente { background-color: #e0e7ff; color: #3730a3; }
+    .badge-attesa { background-color: #f1f5f9; color: #64748b; }
+    .btn-sm { padding: 6px 10px; font-size: 0.8rem; width: auto; margin: 0; border-radius: 6px; }
+    .btn-success { background-color: #10b981; color: white; border: none; }
+    .btn-warning { background-color: #f59e0b; color: white; border: none; }
+    .btn-danger { background-color: #ef4444; color: white; border: none; }
+    .btn-secondary { background-color: #64748b; color: white; border: none; }
+    .flex-row { display: flex; gap: 8px; }
+    .text-center { text-align: center; }
+
+    /* Auth */
+    .auth-card { max-width: 420px; margin: 32px auto; }
+    .auth-tabs { display: flex; gap: 8px; margin-bottom: 16px; }
+    .auth-tabs button { margin: 0; background-color: #eef2ff; color: var(--primary); }
+    .auth-tabs button.active { background-color: var(--primary); color: #fff; }
+    .auth-messaggio { font-size: 0.9rem; margin: 10px 0 0; }
+    .auth-messaggio.errore { color: #dc2626; }
+    .auth-messaggio.ok { color: #16a34a; }
+    .link-button { background: none; color: var(--primary); border: none; padding: 0; margin: 12px 0 0; width: auto; font-size: 0.85rem; font-weight: 600; text-decoration: underline; }
+
+    /* Barra utente */
+    .user-bar { display: flex; align-items: center; justify-content: flex-end; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
+    .user-bar .btn-sm { margin: 0; }
+    .user-bar .nome { font-weight: 600; }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <header>
+    <h1>🥦 Campionato dei Broccoli</h1>
+    <p class="subtitle" id="stato-connessione">Connessione al database...</p>
+  </header>
+
+  <!-- Verifica sessione iniziale -->
+  <section id="vista-caricamento" class="card text-center" style="color:var(--text-muted)">
+    Verifica accesso...
+  </section>
+
+  <!-- LOGIN / REGISTRAZIONE -->
+  <section id="vista-auth" hidden>
+    <div class="card auth-card">
+      <h2 id="auth-titolo">Accedi</h2>
+
+      <div class="auth-tabs">
+        <button type="button" id="tab-login" class="active">Accedi</button>
+        <button type="button" id="tab-registrati">Registrati</button>
+      </div>
+
+      <form id="auth-form" novalidate>
+        <div class="form-group" id="gruppo-nome" hidden>
+          <label for="auth-nome">Nome</label>
+          <input type="text" id="auth-nome" autocomplete="name" maxlength="40" placeholder="Come ti chiami?">
+        </div>
+
+        <div class="form-group">
+          <label for="auth-email">Email</label>
+          <input type="email" id="auth-email" autocomplete="email" placeholder="nome@esempio.com">
+        </div>
+
+        <div class="form-group">
+          <label for="auth-password">Password</label>
+          <input type="password" id="auth-password" autocomplete="current-password" placeholder="Almeno 6 caratteri">
+        </div>
+
+        <p class="auth-messaggio" id="auth-messaggio" hidden></p>
+
+        <button type="submit" id="auth-submit">Accedi</button>
+
+        <button type="button" id="link-password" class="link-button">Password dimenticata?</button>
+      </form>
+    </div>
+  </section>
+
+  <!-- APP -->
+  <div id="vista-app" hidden>
+    <div class="user-bar">
+      <span class="nome" id="user-nome"></span>
+      <span class="badge" id="user-ruolo"></span>
+      <button type="button" id="btn-logout" class="btn-sm btn-secondary">Esci</button>
+    </div>
+
+    <div class="grid">
+      <div class="card">
+        <h2>🏆 Classifica Singola</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>Pos</th>
+              <th>Giocatore</th>
+              <th>Punti</th>
+              <th>V - P</th>
+            </tr>
+          </thead>
+          <tbody id="classifica-body"><tr><td colspan="4" class="text-center">Caricamento dati...</td></tr></tbody>
+        </table>
+      </div>
+
+      <div>
+        <div id="admin-panel">
+          <div class="card">
+            <h2>➕ Aggiungi Incontro</h2>
+            <div class="form-group">
+              <label>Coppia 1</label>
+              <div class="flex-row">
+                <select id="p1a"></select>
+                <select id="p1b"></select>
+              </div>
+            </div>
+            <div class="form-group">
+              <label>Coppia 2</label>
+              <div class="flex-row">
+                <select id="p2a"></select>
+                <select id="p2b"></select>
+              </div>
+            </div>
+            <button id="btn-add-match" disabled>Registra Partita</button>
+          </div>
+
+          <div class="card">
+            <h2>👤 Nuovo Giocatore</h2>
+            <div class="form-group" style="margin-bottom:0;">
+              <input type="text" id="nuovo-giocatore-nome" placeholder="Nome giocatore...">
+            </div>
+            <button id="btn-add-player" class="btn-secondary" disabled>Aggiungi Giocatore</button>
+          </div>
+        </div>
+
+        <div id="sola-lettura" class="card" hidden>
+          <h2>👀 Modalità lettura</h2>
+          <p style="color:var(--text-muted); margin:0; font-size:0.9rem;">
+            Puoi consultare classifica e incontri. Solo l'admin può inserire giocatori, partite e risultati.
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>🎾 Incontri del Torneo</h2>
+      <div id="partite-list" class="text-center" style="color:var(--text-muted)">Caricamento dati...</div>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+  import {
+    getDatabase, ref, set, get, onValue, push, update, remove, runTransaction
+  } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+  import {
+    getAuth, onAuthStateChanged, signInWithEmailAndPassword,
+    createUserWithEmailAndPassword, updateProfile, signOut,
+    sendPasswordResetEmail, setPersistence, browserLocalPersistence
+  } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyBQyQI3TjlbGozQC5i3BEv_1Pfwa2d1sqc",
+    authDomain: "campionato-broccoli.firebaseapp.com",
+    databaseURL: "https://campionato-broccoli-default-rtdb.europe-west1.firebasedatabase.app",
+    projectId: "campionato-broccoli",
+    storageBucket: "campionato-broccoli.firebasestorage.app",
+    messagingSenderId: "124644639356",
+    appId: "1:124644639356:web:d65f69109fef31be5b3ff9"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const db = getDatabase(app);
+  const auth = getAuth(app);
+
+  // Mantiene la sessione anche dopo la chiusura del browser
+  setPersistence(auth, browserLocalPersistence).catch(errore => {
+    console.warn('Persistenza sessione non disponibile:', errore);
+  });
+
+  const statoRef = ref(db, 'campionato');
+  const giocatoriRef = ref(db, 'campionato/giocatori');
+  const partiteRef = ref(db, 'campionato/partite');
+  const connessioneRef = ref(db, '.info/connected');
+  const adminRef = ref(db, 'admin');
+
+  // stato.partite è sempre un array di { id, c1, c2, vincitore, creatoDa, creatoDaNome }
+  let stato = { giocatori: [], partite: [] };
+  let profilo = null;          // { nome, email, ruolo, creatoIl }
+  let utente = null;           // utente Firebase
+  let caricato = false;
+  let unsubscribeDati = null;
+  let modalitaAuth = 'login';
+  let invioInCorso = false;
+  let registrazioneInCorso = false;
+
+  /* ================= AUTENTICAZIONE ================= */
+
+  function isAdmin() {
+    return !!profilo && profilo.ruolo === 'admin';
+  }
+
+  onAuthStateChanged(auth, async (user) => {
+    // Durante la registrazione il profilo viene creato dal gestore del form,
+    // con il nome appena impostato.
+    if (registrazioneInCorso) return;
+
+    if (!user) {
+      utente = null;
+      profilo = null;
+      if (unsubscribeDati) { unsubscribeDati(); unsubscribeDati = null; }
+      stato = { giocatori: [], partite: [] };
+      caricato = false;
+      mostraVista('auth');
+      return;
+    }
+
+    utente = user;
+    mostraVista('loading');
+
+    try {
+      profilo = await assicuraProfilo(user);
+    } catch (errore) {
+      console.error('Errore profilo utente:', errore);
+      alert('Impossibile caricare il profilo utente.\n' + messaggioAuth(errore));
+      await signOut(auth);
+      return;
+    }
+
+    aggiornaBarraUtente();
+    avviaAscoltoDati();
+  });
+
+  async function assicuraProfilo(user) {
+    const profiloRef = ref(db, `utenti/${user.uid}`);
+    const esistente = await get(profiloRef);
+    if (esistente.exists()) return esistente.val();
+
+    // Se non esiste ancora nessun admin, il primo utente registrato lo diventa
+    const adminSnap = await get(adminRef);
+    if (!adminSnap.exists()) {
+      try {
+        await runTransaction(adminRef, valore => (valore === null ? user.uid : undefined));
+      } catch (errore) {
+        console.warn('Impossibile assegnare il primo admin:', errore);
+      }
+    }
+
+    // Rileggo sempre il nodo admin: evita problemi se due schede si registrano insieme
+    const adminFinale = await get(adminRef);
+    const ruolo = adminFinale.val() === user.uid ? 'admin' : 'utente';
+
+    const nome = (user.displayName || (user.email ? user.email.split('@')[0] : 'Utente')).slice(0, 40);
+    const dati = {
+      nome,
+      email: user.email || '',
+      ruolo,
+      creatoIl: Date.now()
+    };
+
+    try {
+      await set(profiloRef, dati);
+      return dati;
+    } catch (errore) {
+      // Può succedere se un'altra scheda ha già creato il profilo
+      const rilettura = await get(profiloRef);
+      if (rilettura.exists()) return rilettura.val();
+      throw errore;
+    }
+  }
+
+  function aggiornaBarraUtente() {
+    if (!profilo) return;
+
+    document.getElementById('user-nome').textContent = profilo.nome;
+    const badge = document.getElementById('user-ruolo');
+    badge.textContent = isAdmin() ? 'Admin' : 'Utente';
+    badge.className = 'badge ' + (isAdmin() ? 'badge-admin' : 'badge-utente');
+
+    document.getElementById('admin-panel').hidden = !isAdmin();
+    document.getElementById('sola-lettura').hidden = isAdmin();
+
+    aggiornaInterfaccia();
+  }
+
+  function mostraVista(vista) {
+    document.getElementById('vista-caricamento').hidden = vista !== 'loading';
+    document.getElementById('vista-auth').hidden = vista !== 'auth';
+    document.getElementById('vista-app').hidden = vista !== 'app';
+  }
+
+  /* -------- Form login / registrazione -------- */
+
+  function impostaModalita(modo) {
+    modalitaAuth = modo;
+    const registrazione = modo === 'register';
+
+    document.getElementById('tab-login').classList.toggle('active', !registrazione);
+    document.getElementById('tab-registrati').classList.toggle('active', registrazione);
+    document.getElementById('auth-titolo').textContent = registrazione ? 'Crea un account' : 'Accedi';
+    document.getElementById('gruppo-nome').hidden = !registrazione;
+    document.getElementById('auth-submit').textContent = registrazione ? 'Registrati' : 'Accedi';
+    document.getElementById('link-password').hidden = registrazione;
+    document.getElementById('auth-password').autocomplete = registrazione ? 'new-password' : 'current-password';
+    nascondiMessaggioAuth();
+  }
+
+  function mostraMessaggioAuth(testo, tipo) {
+    const el = document.getElementById('auth-messaggio');
+    el.textContent = testo;
+    el.className = 'auth-messaggio ' + (tipo || 'errore');
+    el.hidden = false;
+  }
+
+  function nascondiMessaggioAuth() {
+    const el = document.getElementById('auth-messaggio');
+    el.hidden = true;
+    el.textContent = '';
+  }
+
+  function impostaAuthOccupato(occupato) {
+    document.getElementById('auth-submit').disabled = occupato;
+    document.getElementById('tab-login').disabled = occupato;
+    document.getElementById('tab-registrati').disabled = occupato;
+  }
+
+  document.getElementById('tab-login').addEventListener('click', () => impostaModalita('login'));
+  document.getElementById('tab-registrati').addEventListener('click', () => impostaModalita('register'));
+
+  document.getElementById('auth-form').addEventListener('submit', async (evento) => {
+    evento.preventDefault();
+    if (invioInCorso) return;
+
+    const email = document.getElementById('auth-email').value.trim().toLowerCase();
+    const password = document.getElementById('auth-password').value;
+    const nome = document.getElementById('auth-nome').value.trim();
+
+    if (!email) return mostraMessaggioAuth('Inserisci la tua email.');
+    if (!password) return mostraMessaggioAuth('Inserisci la password.');
+    if (modalitaAuth === 'register' && !nome) return mostraMessaggioAuth('Inserisci il tuo nome.');
+    if (modalitaAuth === 'register' && password.length < 6) {
+      return mostraMessaggioAuth('La password deve avere almeno 6 caratteri.');
+    }
+
+    invioInCorso = true;
+    impostaAuthOccupato(true);
+    nascondiMessaggioAuth();
+
+    try {
+      if (modalitaAuth === 'login') {
+        await signInWithEmailAndPassword(auth, email, password);
+        // Il resto lo gestisce onAuthStateChanged
+      } else {
+        registrazioneInCorso = true;
+        try {
+          const credenziale = await createUserWithEmailAndPassword(auth, email, password);
+          await updateProfile(credenziale.user, { displayName: nome });
+          utente = credenziale.user;
+          profilo = await assicuraProfilo(credenziale.user);
+          aggiornaBarraUtente();
+          avviaAscoltoDati();
+          event.target.reset();
+        } finally {
+          registrazioneInCorso = false;
+        }
+      }
+    } catch (errore) {
+      console.error('Errore autenticazione:', errore);
+      mostraMessaggioAuth(messaggioAuth(errore), 'errore');
+      document.getElementById('auth-password').value = '';
+
+      // Se l'account è stato creato ma il profilo no, meglio uscire
+      // e riprovare: evita di restare bloccati sulla schermata di accesso.
+      if (auth.currentUser && !profilo) {
+        try { await signOut(auth); } catch (e) { /* ignora */ }
+      }
+    } finally {
+      invioInCorso = false;
+      impostaAuthOccupato(false);
+    }
+  });
+
+  document.getElementById('link-password').addEventListener('click', async () => {
+    const email = document.getElementById('auth-email').value.trim().toLowerCase();
+    if (!email) {
+      return mostraMessaggioAuth('Scrivi prima la tua email, poi clicca "Password dimenticata?".');
+    }
+    try {
+      await sendPasswordResetEmail(auth, email);
+      mostraMessaggioAuth('Ti ho inviato un\'email per reimpostare la password.', 'ok');
+    } catch (errore) {
+      console.error('Errore reset password:', errore);
+      mostraMessaggioAuth(messaggioAuth(errore), 'errore');
+    }
+  });
+
+  document.getElementById('btn-logout').addEventListener('click', async () => {
+    try {
+      await signOut(auth);
+    } catch (errore) {
+      console.error(errore);
+      alert('Errore durante l\'uscita: ' + messaggioAuth(errore));
+    }
+  });
+
+  function messaggioAuth(errore) {
+    const codice = errore && errore.code ? errore.code : '';
+    switch (codice) {
+      case 'auth/invalid-email': return 'Email non valida.';
+      case 'auth/user-not-found':
+      case 'auth/wrong-password':
+      case 'auth/invalid-credential':
+        return 'Email o password non corretti.';
+      case 'auth/email-already-in-use':
+        return 'Esiste già un account con questa email. Prova ad accedere.';
+      case 'auth/weak-password':
+        return 'La password deve avere almeno 6 caratteri.';
+      case 'auth/too-many-requests':
+        return 'Troppi tentativi. Riprova tra qualche minuto.';
+      case 'auth/network-request-failed':
+        return 'Connessione assente. Controlla la rete e riprova.';
+      case 'auth/operation-not-allowed':
+        return 'Il login con email e password non è attivo nel progetto Firebase.';
+      case 'auth/configuration-not-found':
+        return 'Authentication non è ancora configurata nel progetto Firebase.';
+      case 'auth/unauthorized-domain':
+        return 'Questo dominio non è autorizzato in Firebase Authentication.';
+      case 'permission-denied':
+      case 'PERMISSION_DENIED':
+        return 'Permessi insufficienti: controlla le regole del database.';
+      default:
+        return (errore && errore.message) ? errore.message : 'Errore imprevisto. Riprova.';
+    }
+  }
+
+  /* ================= DATI ================= */
+
+  onValue(connessioneRef, (snapshot) => {
+    impostaStatoConnessione(snapshot.val() === true);
+  });
+
+  function impostaStatoConnessione(online, messaggio) {
+    const el = document.getElementById('stato-connessione');
+    el.textContent = messaggio || (online ? '🟢 Cloud sincronizzato' : '🔴 Offline — in attesa di connessione');
+    el.classList.toggle('ok', !!online);
+    el.classList.toggle('offline', !online);
+  }
+
+  function avviaAscoltoDati() {
+    if (unsubscribeDati) return;
+
+    unsubscribeDati = onValue(statoRef, (snapshot) => {
+      if (!utente) return;
+      stato = normalizza(snapshot.val());
+      caricato = true;
+      document.getElementById('btn-add-player').disabled = !isAdmin();
+      document.getElementById('btn-add-match').disabled = !isAdmin();
+      aggiornaInterfaccia();
+      mostraVista('app');
+    }, (errore) => {
+      console.error('Errore di lettura dal database:', errore);
+      impostaStatoConnessione(false, 'Errore di accesso al database');
+      document.getElementById('classifica-body').innerHTML =
+        '<tr><td colspan="4" class="text-center" style="color:#dc2626">Impossibile leggere i dati dal database.</td></tr>';
+      document.getElementById('partite-list').innerHTML =
+        '<p class="text-center" style="color:#dc2626">Impossibile leggere i dati dal database.</p>';
+      mostraVista('app');
+      alert('Impossibile leggere i dati.\n' + messaggioAuth(errore));
+    });
+  }
+
+  function normalizza(dati) {
+    const g = dati ? dati.giocatori : null;
+    const giocatori = toArray(g).filter(n => typeof n === 'string' && n.trim() !== '');
+
+    const p = dati ? dati.partite : null;
+    const elenco = Array.isArray(p)
+      ? p.map((partita, i) => [String(i), partita])
+      : (p && typeof p === 'object' ? Object.entries(p) : []);
+
+    const partite = [];
+    elenco.forEach(([id, partita]) => {
+      if (!partita || typeof partita !== 'object') return;
+      const c1 = toArray(partita.c1).filter(n => typeof n === 'string');
+      const c2 = toArray(partita.c2).filter(n => typeof n === 'string');
+      if (c1.length === 0 || c2.length === 0) return;
+      partite.push({ ...partita, id, c1, c2, vincitore: Number(partita.vincitore) || 0 });
+    });
+
+    return { giocatori, partite };
+  }
+
+  function toArray(valore) {
+    if (Array.isArray(valore)) return valore;
+    if (valore && typeof valore === 'object') return Object.values(valore);
+    return [];
+  }
+
+  /* ================= INTERFACCIA ================= */
+
+  function aggiornaInterfaccia() {
+    popolaSelect();
+    calcolaClassifica();
+    renderizzaPartite();
+  }
+
+  function popolaSelect() {
+    ['p1a', 'p1b', 'p2a', 'p2b'].forEach(id => {
+      const select = document.getElementById(id);
+      const val = select.value;
+      select.replaceChildren();
+      if (stato.giocatori.length > 0) {
+        stato.giocatori.forEach(g => {
+          const opt = document.createElement('option');
+          opt.value = g;
+          opt.textContent = g;
+          select.appendChild(opt);
+        });
+        if (stato.giocatori.includes(val)) select.value = val;
+      } else {
+        const opt = document.createElement('option');
+        opt.value = '';
+        opt.textContent = 'Aggiungi prima un giocatore';
+        select.appendChild(opt);
+      }
+    });
+  }
+
+  function calcolaClassifica() {
+    const tbody = document.getElementById('classifica-body');
+
+    if (stato.giocatori.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="4" class="text-center" style="color:var(--text-muted)">Nessun giocatore inserito.</td></tr>';
+      return;
+    }
+
+    const stats = new Map(stato.giocatori.map(g => [g, { punti: 0, vinte: 0, perse: 0 }]));
+
+    stato.partite.forEach(p => {
+      const vincitore = Number(p.vincitore);
+      if (vincitore !== 1 && vincitore !== 2) return;
+      const vincenti = vincitore === 1 ? p.c1 : p.c2;
+      const perdenti = vincitore === 1 ? p.c2 : p.c1;
+      vincenti.forEach(g => {
+        if (stats.has(g)) { stats.get(g).punti += 3; stats.get(g).vinte += 1; }
+      });
+      perdenti.forEach(g => {
+        if (stats.has(g)) stats.get(g).perse += 1;
+      });
+    });
+
+    const classifica = stato.giocatori
+      .map(nome => ({ nome, ...stats.get(nome) }))
+      .sort((a, b) => b.punti - a.punti || b.vinte - a.vinte || a.nome.localeCompare(b.nome));
+
+    tbody.replaceChildren(...classifica.map((item, index) => {
+      const tr = document.createElement('tr');
+
+      const pos = document.createElement('td');
+      pos.innerHTML = `<b>${index + 1}º</b>`;
+
+      const nome = document.createElement('td');
+      const bNome = document.createElement('b');
+      bNome.textContent = item.nome;
+      nome.appendChild(bNome);
+
+      const punti = document.createElement('td');
+      const bPunti = document.createElement('b');
+      bPunti.style.color = 'var(--primary)';
+      bPunti.textContent = item.punti;
+      punti.appendChild(bPunti);
+
+      const vp = document.createElement('td');
+      vp.textContent = `${item.vinte}V - ${item.perse}P`;
+
+      tr.append(pos, nome, punti, vp);
+      return tr;
+    }));
+  }
+
+  function creaBottone(testo, classe, azione, id) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = `btn-sm ${classe}`;
+    b.textContent = testo;
+    b.dataset.action = azione;
+    b.dataset.id = id;
+    return b;
+  }
+
+  function renderizzaPartite() {
+    const container = document.getElementById('partite-list');
+
+    if (stato.partite.length === 0) {
+      container.innerHTML = '<p class="text-center" style="color:var(--text-muted)">Nessuna partita presente.</p>';
+      return;
+    }
+
+    const pezzi = stato.partite.map(p => {
+      const item = document.createElement('div');
+      item.className = 'match-item';
+
+      const info = document.createElement('div');
+      const s1 = document.createElement('strong');
+      s1.textContent = p.c1.join(' & ');
+      const vs = document.createTextNode(' vs ');
+      const s2 = document.createElement('strong');
+      s2.textContent = p.c2.join(' & ');
+      info.append(s1, vs, s2);
+
+      if (p.creatoDaNome) {
+        const meta = document.createElement('div');
+        meta.className = 'match-meta';
+        meta.textContent = `Inserita da ${p.creatoDaNome}`;
+        info.appendChild(meta);
+      }
+
+      const azioni = document.createElement('div');
+      azioni.className = 'match-actions';
+
+      if (p.vincitore === 0) {
+        if (isAdmin()) {
+          azioni.append(
+            creaBottone('Vince C1', 'btn-success', 'vince1', p.id),
+            creaBottone('Vince C2', 'btn-success', 'vince2', p.id),
+            creaBottone('Elimina', 'btn-danger', 'elimina', p.id)
+          );
+        } else {
+          const attesa = document.createElement('span');
+          attesa.className = 'badge badge-attesa';
+          attesa.textContent = 'In attesa di risultato';
+          azioni.appendChild(attesa);
+        }
+      } else {
+        const vincenti = p.vincitore === 1 ? p.c1 : p.c2;
+        const badge = document.createElement('span');
+        badge.className = 'badge badge-win';
+        badge.textContent = `Vince: ${vincenti.join(' & ')}`;
+        azioni.appendChild(badge);
+
+        if (isAdmin()) {
+          azioni.append(
+            creaBottone('Annulla', 'btn-warning', 'annulla', p.id),
+            creaBottone('Elimina', 'btn-danger', 'elimina', p.id)
+          );
+        }
+      }
+
+      item.append(info, azioni);
+      return item;
+    });
+
+    container.replaceChildren(...pezzi);
+  }
+
+  /* ================= AZIONI (SOLO ADMIN) ================= */
+
+  function permessoAdmin() {
+    if (!isAdmin()) {
+      alert('Solo l\'admin può modificare i dati.');
+      return false;
+    }
+    return true;
+  }
+
+  async function aggiungiGiocatore(nome) {
+    if (!permessoAdmin()) return;
+    if (!caricato) {
+      alert('Attendi il caricamento dei dati dal cloud...');
+      return;
+    }
+    if (stato.giocatori.includes(nome)) {
+      alert('Questo giocatore esiste già!');
+      return;
+    }
+
+    stato.giocatori.push(nome);
+    aggiornaInterfaccia();
+
+    try {
+      await runTransaction(giocatoriRef, (lista) => {
+        const attuale = toArray(lista).filter(n => typeof n === 'string');
+        if (attuale.includes(nome)) return attuale;
+        attuale.push(nome);
+        return attuale;
+      });
+    } catch (errore) {
+      mostraErrore(errore);
+    }
+  }
+
+  async function aggiungiPartita(c1, c2) {
+    if (!permessoAdmin()) return;
+    if (!caricato) {
+      alert('Attendi il caricamento dei dati dal cloud...');
+      return;
+    }
+
+    const nuovaRef = push(partiteRef);
+    const partita = {
+      c1,
+      c2,
+      vincitore: 0,
+      creatoDa: utente.uid,
+      creatoDaNome: profilo.nome,
+      creatoIl: Date.now()
+    };
+
+    stato.partite.push({ id: nuovaRef.key, ...partita });
+    aggiornaInterfaccia();
+
+    try {
+      await set(nuovaRef, partita);
+    } catch (errore) {
+      mostraErrore(errore);
+    }
+  }
+
+  async function impostaVincitore(id, vincitore) {
+    if (!permessoAdmin()) return;
+
+    const partita = stato.partite.find(p => p.id === id);
+    if (partita) {
+      partita.vincitore = vincitore;
+      aggiornaInterfaccia();
+    }
+
+    try {
+      await update(ref(db, `campionato/partite/${id}`), { vincitore });
+    } catch (errore) {
+      mostraErrore(errore);
+    }
+  }
+
+  async function eliminaPartita(id) {
+    if (!permessoAdmin()) return;
+    if (!confirm('Vuoi eliminare questa partita?')) return;
+
+    stato.partite = stato.partite.filter(p => p.id !== id);
+    aggiornaInterfaccia();
+
+    try {
+      await remove(ref(db, `campionato/partite/${id}`));
+    } catch (errore) {
+      mostraErrore(errore);
+    }
+  }
+
+  function mostraErrore(errore) {
+    console.error('Errore di salvataggio:', errore);
+    alert(`Salvataggio non riuscito: ${errore && errore.message ? errore.message : errore}`);
+    // Riallinea l'interfaccia con quello che c'è davvero sul server
+    get(statoRef).then(snapshot => {
+      stato = normalizza(snapshot.val());
+      aggiornaInterfaccia();
+    }).catch(() => {});
+  }
+
+  /* ================= EVENTI ================= */
+
+  document.getElementById('btn-add-match').addEventListener('click', async (evento) => {
+    const bottone = evento.currentTarget;
+    if (!permessoAdmin()) return;
+
+    const p1a = document.getElementById('p1a').value;
+    const p1b = document.getElementById('p1b').value;
+    const p2a = document.getElementById('p2a').value;
+    const p2b = document.getElementById('p2b').value;
+
+    if (!p1a || !p1b || !p2a || !p2b) {
+      alert('Seleziona prima i giocatori per le coppie!');
+      return;
+    }
+
+    if (new Set([p1a, p1b, p2a, p2b]).size !== 4) {
+      alert('I 4 giocatori devono essere tutti diversi tra loro!');
+      return;
+    }
+
+    bottone.disabled = true;
+    try {
+      await aggiungiPartita([p1a, p1b], [p2a, p2b]);
+    } finally {
+      bottone.disabled = false;
+    }
+  });
+
+  document.getElementById('btn-add-player').addEventListener('click', async (evento) => {
+    const bottone = evento.currentTarget;
+    if (!permessoAdmin()) return;
+
+    const input = document.getElementById('nuovo-giocatore-nome');
+    const nome = input.value.trim();
+    if (!nome) return;
+
+    bottone.disabled = true;
+    input.value = '';
+    try {
+      await aggiungiGiocatore(nome);
+    } finally {
+      bottone.disabled = false;
+    }
+  });
+
+  document.getElementById('nuovo-giocatore-nome').addEventListener('keydown', (evento) => {
+    if (evento.key === 'Enter') document.getElementById('btn-add-player').click();
+  });
+
+  document.getElementById('partite-list').addEventListener('click', (evento) => {
+    const bottone = evento.target.closest('button[data-action]');
+    if (!bottone) return;
+
+    const id = bottone.dataset.id;
+    switch (bottone.dataset.action) {
+      case 'vince1': impostaVincitore(id, 1); break;
+      case 'vince2': impostaVincitore(id, 2); break;
+      case 'annulla': impostaVincitore(id, 0); break;
+      case 'elimina': eliminaPartita(id); break;
+    }
+  });
+</script>
+
+</body>
+</html>
