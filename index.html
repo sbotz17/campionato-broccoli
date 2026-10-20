@@ -62,6 +62,10 @@
     .auth-tabs { display: flex; gap: 8px; margin-bottom: 16px; }
     .auth-tabs button { margin: 0; background-color: #eef2ff; color: var(--primary); }
     .auth-tabs button.active { background-color: var(--primary); color: #fff; }
+    .password-wrap { position: relative; }
+    .password-wrap input { padding-right: 90px; }
+    .toggle-password { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); width: auto; margin: 0; padding: 6px 10px; background: transparent; color: var(--primary); font-size: 0.8rem; }
+    .toggle-password:hover { text-decoration: underline; }
     .auth-messaggio { font-size: 0.9rem; margin: 10px 0 0; }
     .auth-messaggio.errore { color: #dc2626; }
     .auth-messaggio.ok { color: #16a34a; }
@@ -104,12 +108,15 @@
 
         <div class="form-group">
           <label for="auth-email">Email</label>
-          <input type="email" id="auth-email" autocomplete="email" placeholder="nome@esempio.com">
+          <input type="email" id="auth-email" autocomplete="username" placeholder="nome@esempio.com">
         </div>
 
         <div class="form-group">
           <label for="auth-password">Password</label>
-          <input type="password" id="auth-password" autocomplete="current-password" placeholder="Almeno 6 caratteri">
+          <div class="password-wrap">
+            <input type="password" id="auth-password" autocomplete="current-password" placeholder="Almeno 6 caratteri">
+            <button type="button" id="toggle-password" class="toggle-password" aria-label="Mostra password" aria-pressed="false">Mostra</button>
+          </div>
         </div>
 
         <p class="auth-messaggio" id="auth-messaggio" hidden></p>
@@ -216,10 +223,15 @@
   const db = getDatabase(app);
   const auth = getAuth(app);
 
-  // Mantiene la sessione anche dopo la chiusura del browser
-  setPersistence(auth, browserLocalPersistence).catch(errore => {
-    console.warn('Persistenza sessione non disponibile:', errore);
-  });
+  // Mantiene la sessione anche dopo la chiusura del browser.
+  // Registro il listener solo dopo aver impostato la persistenza.
+  setPersistence(auth, browserLocalPersistence)
+    .catch(errore => {
+      console.warn('Persistenza sessione non disponibile:', errore);
+    })
+    .finally(() => {
+      onAuthStateChanged(auth, gestisciStatoAuth);
+    });
 
   const statoRef = ref(db, 'campionato');
   const giocatoriRef = ref(db, 'campionato/giocatori');
@@ -237,13 +249,39 @@
   let invioInCorso = false;
   let registrazioneInCorso = false;
 
+  /* -------- Elementi del form e email ricordata -------- */
+
+  const CHIAVE_EMAIL = 'broccoli_ultima_email';
+  const emailInput = document.getElementById('auth-email');
+  const passwordInput = document.getElementById('auth-password');
+  const togglePassword = document.getElementById('toggle-password');
+
+  function leggiEmailSalvata() {
+    try { return localStorage.getItem(CHIAVE_EMAIL) || ''; } catch (errore) { return ''; }
+  }
+
+  function salvaEmail(email) {
+    try { localStorage.setItem(CHIAVE_EMAIL, email); } catch (errore) { /* ignora */ }
+  }
+
+  if (!emailInput.value) emailInput.value = leggiEmailSalvata();
+
+  togglePassword.addEventListener('click', () => {
+    const mostra = passwordInput.type === 'password';
+    passwordInput.type = mostra ? 'text' : 'password';
+    togglePassword.textContent = mostra ? 'Nascondi' : 'Mostra';
+    togglePassword.setAttribute('aria-pressed', String(mostra));
+    togglePassword.setAttribute('aria-label', mostra ? 'Nascondi password' : 'Mostra password');
+    passwordInput.focus();
+  });
+
   /* ================= AUTENTICAZIONE ================= */
 
   function isAdmin() {
     return !!profilo && profilo.ruolo === 'admin';
   }
 
-  onAuthStateChanged(auth, async (user) => {
+  async function gestisciStatoAuth(user) {
     // Durante la registrazione il profilo viene creato dal gestore del form,
     // con il nome appena impostato.
     if (registrazioneInCorso) return;
@@ -254,6 +292,7 @@
       if (unsubscribeDati) { unsubscribeDati(); unsubscribeDati = null; }
       stato = { giocatori: [], partite: [] };
       caricato = false;
+      if (!emailInput.value) emailInput.value = leggiEmailSalvata();
       mostraVista('auth');
       return;
     }
@@ -272,7 +311,7 @@
 
     aggiornaBarraUtente();
     avviaAscoltoDati();
-  });
+  }
 
   async function assicuraProfilo(user) {
     const profiloRef = ref(db, `utenti/${user.uid}`);
@@ -344,7 +383,15 @@
     document.getElementById('gruppo-nome').hidden = !registrazione;
     document.getElementById('auth-submit').textContent = registrazione ? 'Registrati' : 'Accedi';
     document.getElementById('link-password').hidden = registrazione;
-    document.getElementById('auth-password').autocomplete = registrazione ? 'new-password' : 'current-password';
+    passwordInput.autocomplete = registrazione ? 'new-password' : 'current-password';
+    emailInput.autocomplete = registrazione ? 'email' : 'username';
+
+    // Riporta la password in modalità nascosta quando si cambia scheda
+    passwordInput.type = 'password';
+    togglePassword.textContent = 'Mostra';
+    togglePassword.setAttribute('aria-pressed', 'false');
+    togglePassword.setAttribute('aria-label', 'Mostra password');
+
     nascondiMessaggioAuth();
   }
 
@@ -379,6 +426,7 @@
     const nome = document.getElementById('auth-nome').value.trim();
 
     if (!email) return mostraMessaggioAuth('Inserisci la tua email.');
+    salvaEmail(email);
     if (!password) return mostraMessaggioAuth('Inserisci la password.');
     if (modalitaAuth === 'register' && !nome) return mostraMessaggioAuth('Inserisci il tuo nome.');
     if (modalitaAuth === 'register' && password.length < 6) {
@@ -403,6 +451,10 @@
           aggiornaBarraUtente();
           avviaAscoltoDati();
           evento.target.reset();
+          passwordInput.type = 'password';
+          togglePassword.textContent = 'Mostra';
+          togglePassword.setAttribute('aria-pressed', 'false');
+          togglePassword.setAttribute('aria-label', 'Mostra password');
         } finally {
           registrazioneInCorso = false;
         }
