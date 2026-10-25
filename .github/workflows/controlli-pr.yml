@@ -1,0 +1,39 @@
+name: controlli-pr
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  controlli:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Controlla index.html
+        run: |
+          python3 - <<'PY'
+          from html.parser import HTMLParser
+          from pathlib import Path
+          import sys
+
+          p = Path("index.html")
+          if not p.exists() or p.stat().st_size < 1000:
+              print("::error::index.html mancante o troppo piccolo"); sys.exit(1)
+          text = p.read_text(encoding="utf-8")
+          HTMLParser().feed(text)
+          if "<html" not in text or "</html>" not in text:
+              print("::error::index.html incompleto"); sys.exit(1)
+          if "<script" not in text:
+              print("::error::index.html senza script"); sys.exit(1)
+          print("index.html valido")
+          PY
+      - name: Nessun segreto nei file
+        run: |
+          if grep -rInE "sk-[A-Za-z0-9]{10,}|AIza[0-9A-Za-z_-]{20,}|-----BEGIN [A-Z ]*PRIVATE KEY" \
+            --exclude-dir=.git .; then
+            echo "::error::Possibile segreto nel repository"; exit 1
+          fi
